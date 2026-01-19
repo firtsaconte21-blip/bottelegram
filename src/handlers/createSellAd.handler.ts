@@ -1,0 +1,219 @@
+
+import { Context, Markup } from 'telegraf';
+import { stateService } from '../services/state.service.js';
+import { adsService } from '../services/ads.service.js';
+import { TelegramService } from '../services/telegram.service.js';
+import { TempData } from '../types/index.js';
+
+let telegramService: TelegramService;
+
+export function setSellAdTelegramService(service: TelegramService) {
+    telegramService = service;
+}
+
+/**
+ * Inicia o fluxo de criação de anúncio de VENDA
+ */
+export async function startCreateSellAd(ctx: Context): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    await stateService.setState(userId, 'ASK_SELL_MILES', {});
+
+    await ctx.reply(
+        '⚠️ *ATENÇÃO:*\nSe você deseja *VENDER* milhas, continue o preenchimento.\n\nQuantas milhas você tem disponíveis para *VENDA*?',
+        { parse_mode: 'Markdown' }
+    );
+}
+
+/**
+ * Processa a quantidade de milhas
+ * Parser: remove pontos (5.000 -> 5000)
+ */
+export async function handleSellMilesResponse(ctx: Context, text: string): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    // Parser: 123.456 -> 123456
+    const cleanInput = text.replace(/\./g, '');
+    const miles = parseInt(cleanInput, 10);
+
+    if (isNaN(miles) || miles <= 0) {
+        await ctx.reply('❌ Número inválido. Por favor, digite a quantidade correta (ex: 5.000 ou 5000).');
+        return;
+    }
+
+    if (miles < 1000) {
+        await ctx.reply('⚠️ Recomendamos anunciar no mínimo 1.000 milhas. Digite novamente se quiser corrigir ou continue.');
+    }
+
+    await stateService.updateUserState(userId, 'ASK_SELL_PROGRAM', { miles });
+
+    await ctx.reply(
+        '🏢 *Qual programa de fidelidade você deseja VENDER milhas?*\n(selecione uma opção ou digite outro)',
+        {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('LATAM', 'program_sell_latam'), Markup.button.callback('Smiles', 'program_sell_smiles')],
+                [Markup.button.callback('Azul', 'program_sell_azul'), Markup.button.callback('Azul Interline', 'program_sell_azul_interline')],
+                [Markup.button.callback('Iberia', 'program_sell_iberia'), Markup.button.callback('TAP', 'program_sell_tap')],
+                [Markup.button.callback('American Airlines', 'program_sell_american'), Markup.button.callback('Copa Airlines', 'program_sell_copa')],
+                [Markup.button.callback('Qatar Airways', 'program_sell_qatar'), Markup.button.callback('Air France', 'program_sell_airfrance')],
+                [Markup.button.callback('KLM', 'program_sell_klm'), Markup.button.callback('Alaska Airlines', 'program_sell_alaska')],
+                [Markup.button.callback('Virgin Atlantic', 'program_sell_virgin'), Markup.button.callback('Delta Air Lines', 'program_sell_delta')],
+                [Markup.button.callback('United Airlines', 'program_sell_united'), Markup.button.callback('Air Canada', 'program_sell_aircanada')],
+                [Markup.button.callback('Air Europa', 'program_sell_aireuropa'), Markup.button.callback('Avianca', 'program_sell_avianca')],
+            ])
+        }
+    );
+}
+
+/**
+ * Processa o programa de fidelidade
+ */
+export async function handleSellProgramResponse(ctx: Context, text: string): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    let program = text.trim();
+
+    // Se for callback, processa
+    if (text.startsWith('program_sell_')) {
+        program = text.replace('program_sell_', '').toUpperCase();
+    } else {
+        program = program.toUpperCase();
+    }
+
+    await stateService.updateUserState(userId, 'ASK_SELL_PRICE', { program });
+
+    await ctx.reply(
+        '💰 *Qual valor você deseja RECEBER por cada mil milhas?*\n(digite apenas números, ex: 26 ou 26,00)',
+        { parse_mode: 'Markdown' }
+    );
+}
+
+/**
+ * Processa o preço
+ * Parser: 26,00 -> 26.00
+ */
+export async function handleSellPriceResponse(ctx: Context, text: string): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    // Parser: 26,00 -> 26.00
+    const cleanInput = text.replace(',', '.');
+    const price = parseFloat(cleanInput);
+
+    if (isNaN(price) || price <= 0) {
+        await ctx.reply('❌ Valor inválido. Digite apenas números (ex: 26,50).');
+        return;
+    }
+
+    await stateService.updateUserState(userId, 'ASK_SELL_URGENT', { price });
+
+    await ctx.reply(
+        '▶️ *Emissão para mais de sete dias?*',
+        {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('✅ SIM (Mais de 7 dias)', 'urgent_sell_no')],
+                [Markup.button.callback('❌ NÃO (Menos de 7 dias)', 'urgent_sell_yes')]
+            ])
+        }
+    );
+}
+
+/**
+ * Processa a urgência
+ */
+export async function handleSellUrgentResponse(ctx: Context, input: 'yes' | 'no' | string): Promise<void> {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    const urgent = input === 'yes' || input === 'Sim';
+    await stateService.updateUserState(userId, 'CONFIRM_SELL_AD', { urgent });
+
+    // Recupera dados para o resumo
+    const state = await stateService.getState(userId);
+    const data = state?.temp_data;
+
+    if (!data || !data.miles || !data.program || !data.price) {
+        await ctx.reply('❌ Erro nos dados. Vamos recomeçar.');
+        await startCreateSellAd(ctx);
+        return;
+    }
+
+    const total = (data.miles / 1000) * data.price;
+    const emissaoEmoji = urgent ? '❌' : '✅';
+
+    const summary = `
+📄 *RESUMO DO ANÚNCIO DE VENDA*
+
+Você está vendendo:
+✈️ *${data.miles.toLocaleString('pt-BR')} milhas ${data.program}*
+💰 *R$ ${data.price.toFixed(2)} por mil milhas*
+⌛ *Mais de 7 dias:* ${emissaoEmoji}
+
+💵 *Total estimado:* R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + taxas
+
+*Você confirma?*
+  `.trim();
+
+    await ctx.reply(summary, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([
+            [Markup.button.callback('✅ CONFIRMO', 'confirm_sell_yes')],
+            [Markup.button.callback('🔄 REINICIAR', 'confirm_sell_restart')]
+        ])
+    });
+}
+
+/**
+ * Confirma e salva o anúncio
+ */
+export async function handleConfirmSellAd(ctx: Context, input: string): Promise<void> {
+    const userId = ctx.from?.id;
+    const username = ctx.from?.username || null;
+    if (!userId) return;
+
+    if (input === 'restart') {
+        await startCreateSellAd(ctx);
+        return;
+    }
+
+    const state = await stateService.getState(userId);
+    const data = state?.temp_data;
+
+    if (!data || !data.miles || !data.program || !data.price) {
+        await ctx.reply('❌ Dados perdidos. Por favor, comece novamente.');
+        await startCreateSellAd(ctx);
+        return;
+    }
+
+    const ad = await adsService.createFromTempData(userId, username, {
+        ...data,
+        type: 'SELL', // Força tipo VENDA
+        companhia: data.program, // Map program -> companhia
+        quantidade: data.miles, // Map miles -> quantidade
+        valor_milheiro: data.price, // Map price -> valor_milheiro
+        passengers: undefined, // Explicitamente NULL
+        urgent: data.urgent // Persiste a urgência
+    });
+
+    if (ad) {
+        await ctx.reply(`✅ *Anúncio de VENDA criado com sucesso!*\n\n⚠️ *AVISO IMPORTANTE:*\nO SKYMILLES NÃO SE RESPONSABILIZA POR QUALQUER TRANSAÇÃO.\n\nNegocie com atenção.\nHonre os valores combinados.`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+                [Markup.button.callback('🗑️ EXCLUIR OFERTA DE VENDA', `delete_ad_${ad.id}`)]
+            ])
+        });
+
+        if (telegramService) {
+            await telegramService.publishAdToGroup(ad);
+        }
+    } else {
+        await ctx.reply('❌ Erro ao salvar anúncio. Tente novamente.');
+    }
+
+    await stateService.reset(userId);
+}
