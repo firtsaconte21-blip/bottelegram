@@ -6,6 +6,10 @@ if ! command -v pm2 &> /dev/null; then
     npm install -g pm2
 fi
 
+# 1.1 Compilar o projeto (TypeScript -> JS)
+echo "🔨 Compilando o projeto..."
+npm run build
+
 # 2. Iniciar aplicações via PM2
 echo "🚀 Iniciando Bot e Ngrok com PM2..."
 pm2 start ecosystem.config.js
