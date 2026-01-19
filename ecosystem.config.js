@@ -1,3 +1,5 @@
+const webhookUrl = process.env.WEBHOOK_URL;
+
 module.exports = {
     apps: [
         {
