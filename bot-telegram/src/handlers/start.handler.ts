@@ -16,6 +16,9 @@ export async function handleStart(ctx: Context): Promise<void> {
 
   if (!userId) return;
 
+  // Reseta qualquer estado anterior ao iniciar
+  await stateService.reset(userId);
+
   // Registra usuário (tracking de "Membro desde")
   await userService.registerUser(userId, ctx.from?.username || null);
 
@@ -49,9 +52,6 @@ export async function handleStart(ctx: Context): Promise<void> {
  * Mostra o menu principal do bot
  */
 async function showMainMenu(ctx: Context, userId: number): Promise<void> {
-  // Reseta qualquer estado anterior
-  await stateService.reset(userId);
-
   // Verifica se o usuário está vinculado a uma conta do site
   const linkedUserId = await authService.getLinkedUser(userId);
 

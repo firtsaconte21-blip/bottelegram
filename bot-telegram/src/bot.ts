@@ -81,10 +81,8 @@ const telegramService = createTelegramService(bot);
 // Injeta o serviço nos handlers
 setTelegramService(telegramService);
 setProposalTelegramService(telegramService);
-setTelegramService(telegramService);
 setBuyAdTelegramService(telegramService);
 setSellAdTelegramService(telegramService);
-setProposalTelegramService(telegramService);
 setAcceptTelegramService(telegramService);
 setChooseSellerTelegramService(telegramService);
 setUserStatsTelegramService(telegramService);
@@ -549,6 +547,11 @@ bot.on('text', async (ctx) => {
   }
 
   if (!state || state.state === 'IDLE') {
+    // Se não tem estado mas parece um e-mail, tenta processar como login
+    if (text.includes('@') && text.includes('.')) {
+      console.log(`[DEBUG] No state for ${userId} but text looks like email. Routing to handleLoginEmail.`);
+      return handleLoginEmail(ctx, text);
+    }
     // Usuário não está em nenhum fluxo, redireciona para o menu iniciar
     return handleStart(ctx);
   }
