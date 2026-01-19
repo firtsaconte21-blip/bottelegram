@@ -16,7 +16,9 @@ export async function startCreateBuyAd(ctx: Context): Promise<void> {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    await stateService.setState(userId, 'ASK_BUY_MILES', { type: 'BUY' });
+    console.log(`[BUY_AD] Starting flow for user ${userId}`);
+    const ok = await stateService.setState(userId, 'ASK_BUY_MILES', { type: 'BUY' });
+    if (!ok) console.error(`[BUY_AD] Failed to set initial state for ${userId}`);
 
     await ctx.reply(
         '⚠️ *ATENÇÃO:*\n' +
@@ -34,6 +36,7 @@ export async function handleBuyMilesResponse(ctx: Context, text: string): Promis
     const userId = ctx.from?.id;
     if (!userId) return;
 
+    console.log(`[BUY_AD] Miles response from ${userId}: ${text}`);
     // Tratamento de número
     const cleaned = text.replace(/\./g, "").replace(",", ".");
     const miles = parseFloat(cleaned);
@@ -43,7 +46,8 @@ export async function handleBuyMilesResponse(ctx: Context, text: string): Promis
         return;
     }
 
-    await stateService.updateUserState(userId, 'ASK_BUY_PROGRAM', { miles });
+    const ok = await stateService.updateUserState(userId, 'ASK_BUY_PROGRAM', { miles });
+    if (!ok) console.error(`[BUY_AD] Failed to update state to ASK_BUY_PROGRAM for ${userId}`);
 
     await ctx.reply(
         'Qual programa de fidelidade você está interessado em adquirir milhas?\n' +

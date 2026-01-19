@@ -17,16 +17,24 @@ class StateService {
     state: UserState,
     tempData?: TempData
   ): Promise<boolean> {
-    // Se tempData não for fornecido, mantém os dados existentes
-    if (tempData === undefined) {
-      const current = await this.getState(userId);
-      tempData = current?.temp_data || {};
-    }
+    try {
+      // Se tempData não for fornecido, mantém os dados existentes
+      if (tempData === undefined) {
+        const current = await this.getState(userId);
+        tempData = current?.temp_data || {};
+      }
 
-    console.log(`[DEBUG] Setting state for ${userId} to ${state}`);
-    const result = await db.setUserState(userId, state, tempData);
-    console.log(`[DEBUG] Set state result for ${userId}: ${result}`);
-    return result;
+      console.log(`[STATE] Setting state for ${userId}: ${state}`, tempData);
+      const result = await db.setUserState(userId, state, tempData);
+
+      if (!result) {
+        console.error(`[STATE] Failed to set state for ${userId} to ${state}`);
+      }
+      return result;
+    } catch (error) {
+      console.error(`[STATE] Error in setState for ${userId}:`, error);
+      return false;
+    }
   }
 
   /**
@@ -44,11 +52,22 @@ class StateService {
    * Atualiza o estado e mescla novos dados temporários
    */
   async updateUserState(userId: number, state: UserState, updates: Partial<TempData>): Promise<boolean> {
-    const current = await this.getState(userId);
-    const currentData = current?.temp_data || {};
-    const newData = { ...currentData, ...updates };
+    try {
+      const current = await this.getState(userId);
+      const currentData = current?.temp_data || {};
+      const newData = { ...currentData, ...updates };
 
-    return db.setUserState(userId, state, newData);
+      console.log(`[STATE] Updating state for ${userId}: ${state}`, updates);
+      const result = await db.setUserState(userId, state, newData);
+
+      if (!result) {
+        console.error(`[STATE] Failed to update state for ${userId} to ${state}`);
+      }
+      return result;
+    } catch (error) {
+      console.error(`[STATE] Error in updateUserState for ${userId}:`, error);
+      return false;
+    }
   }
 
   /**

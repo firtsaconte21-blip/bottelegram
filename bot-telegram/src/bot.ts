@@ -539,11 +539,10 @@ bot.on('text', async (ctx) => {
 
   // Busca estado atual do usuário
   const state = await stateService.getState(userId);
-
   if (state) {
-    console.log(`[DEBUG] Msg from ${userId} - Current State: ${state.state}`);
+    console.log(`[DISPATCH] Msg from ${userId} - Current State: ${state.state}`);
   } else {
-    console.log(`[DEBUG] Msg from ${userId} - No State found (or null).`);
+    console.log(`[DISPATCH] Msg from ${userId} - No State found (null).`);
   }
 
   if (!state || state.state === 'IDLE') {
@@ -640,6 +639,7 @@ bot.on('text', async (ctx) => {
       break;
 
     default:
+      console.warn(`[DISPATCH] Unexpected state '${state.state}' for user ${userId}. Resetting and going to start.`);
       await stateService.reset(userId);
       return handleStart(ctx);
   }

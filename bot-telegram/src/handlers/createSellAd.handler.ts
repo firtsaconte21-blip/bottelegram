@@ -18,7 +18,9 @@ export async function startCreateSellAd(ctx: Context): Promise<void> {
     const userId = ctx.from?.id;
     if (!userId) return;
 
-    await stateService.setState(userId, 'ASK_SELL_MILES', {});
+    console.log(`[SELL_AD] Starting flow for user ${userId}`);
+    const ok = await stateService.setState(userId, 'ASK_SELL_MILES', {});
+    if (!ok) console.error(`[SELL_AD] Failed to set initial state for ${userId}`);
 
     await ctx.reply(
         '⚠️ *ATENÇÃO:*\nSe você deseja *VENDER* milhas, continue o preenchimento.\n\nQuantas milhas você tem disponíveis para *VENDA*?',
@@ -34,6 +36,7 @@ export async function handleSellMilesResponse(ctx: Context, text: string): Promi
     const userId = ctx.from?.id;
     if (!userId) return;
 
+    console.log(`[SELL_AD] Miles response from ${userId}: ${text}`);
     // Parser: 123.456 -> 123456
     const cleanInput = text.replace(/\./g, '');
     const miles = parseInt(cleanInput, 10);
@@ -47,7 +50,8 @@ export async function handleSellMilesResponse(ctx: Context, text: string): Promi
         await ctx.reply('⚠️ Recomendamos anunciar no mínimo 1.000 milhas. Digite novamente se quiser corrigir ou continue.');
     }
 
-    await stateService.updateUserState(userId, 'ASK_SELL_PROGRAM', { miles });
+    const ok = await stateService.updateUserState(userId, 'ASK_SELL_PROGRAM', { miles });
+    if (!ok) console.error(`[SELL_AD] Failed to update state to ASK_SELL_PROGRAM for ${userId}`);
 
     await ctx.reply(
         '🏢 *Qual programa de fidelidade você deseja VENDER milhas?*\n(selecione uma opção ou digite outro)',
