@@ -9,7 +9,14 @@ import { checkAccess } from './services/middleware.service.js';
 
 // Handlers
 import { handleStart, handleHelp } from './handlers/start.handler.js';
-import { handleLogin } from './handlers/auth.handler.js';
+import {
+  handleLogin,
+  handleLogout,
+  handleLoginEmail,
+  handleLoginPassword,
+  handleResendEmail,
+  handleVerificationHelp
+} from './handlers/auth.handler.js';
 import { authService } from './services/auth.service.js';
 import {
   startCreateAd,
@@ -18,7 +25,6 @@ import {
   handlePriceResponse,
   setTelegramService
 } from './handlers/createAd.handler.js';
-import { handleLoginEmail, handleLoginPassword, handleResendEmail, handleVerificationHelp } from './handlers/auth.handler.js';
 import {
   startCreateBuyAd,
   handleBuyMilesResponse,
@@ -219,6 +225,7 @@ bot.command('start', handleStart);
 bot.command('login', handleLogin);
 bot.command('pix', startPixFlow);
 bot.command('planos', showPlans);
+bot.command('exit', handleLogout);
 
 bot.command('cancelar', async (ctx) => {
   const userId = ctx.from?.id;
@@ -226,6 +233,47 @@ bot.command('cancelar', async (ctx) => {
 
   await stateService.reset(userId);
   await ctx.reply('✅ Operação cancelada. Use /start para começar novamente.');
+});
+
+// Boas-vindas para novos membros do grupo
+bot.on('new_chat_members', async (ctx) => {
+  const newMembers = ctx.message.new_chat_members;
+  const chatId = ctx.chat.id.toString();
+
+  // Verifica se o evento veio do grupo principal
+  if (chatId !== config.telegramGroupId) return;
+
+  for (const member of newMembers) {
+    if (member.is_bot) continue;
+
+    const welcomeMsg = `
+🌟 *Bem-vindo(a) ao Marketplace de Milhas!* 🌟
+
+Olá! 👋 É um prazer ter você aqui. Nosso marketplace foi criado para facilitar a compra e venda de milhas de forma simples, segura e rápida.
+
+💡 *Como funciona:*
+
+*Comprar milhas:* Você pode adquirir milhas de outros usuários que têm pontos acumulados e usá-las para emitir suas passagens.
+
+*Vender milhas:* Se você possui milhas, pode vendê-las emitindo passagens para pessoas interessadas em viajar.
+
+✨ *Por que usar nosso marketplace?*
+
+✅ Transações seguras e confiáveis
+✅ Conexão direta entre compradores e vendedores
+✅ Facilidade na emissão de passagens
+
+🚀 *Comece agora explorando as ofertas disponíveis ou anunciando suas milhas!*
+    `.trim();
+
+    try {
+      await ctx.telegram.sendMessage(member.id, welcomeMsg, { parse_mode: 'Markdown' });
+      console.log(`✅ Mensagem de boas-vindas enviada para o PV de ${member.first_name} (${member.id})`);
+    } catch (error: any) {
+      // O Telegram só permite enviar PV se o usuário já tiver interagido com o bot antes
+      console.warn(`⚠️ Não foi possível enviar PV para ${member.id}: (Pode ser que o usuário nunca tenha iniciado o bot)`);
+    }
+  }
 });
 
 // Catch-all para comandos de usuários não registrados
@@ -237,8 +285,8 @@ bot.on('message', async (ctx, next) => {
 
   const text = message.text;
 
-  // Se for um comando (começa com /) e não for /start, /login, /pix ou /cancelar
-  if (text.startsWith('/') && !['/start', '/login', '/pix', '/cancelar'].some(cmd => text.startsWith(cmd))) {
+  // Se for um comando (começa com /) e não for /start, /login, /pix, /cancelar ou /exit
+  if (text.startsWith('/') && !['/start', '/login', '/pix', '/cancelar', '/exit'].some(cmd => text.startsWith(cmd))) {
     const linkedUserId = await authService.getLinkedUser(userId);
 
     if (!linkedUserId) {

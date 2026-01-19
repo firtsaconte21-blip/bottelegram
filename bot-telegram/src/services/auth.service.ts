@@ -68,6 +68,23 @@ export class AuthService {
     }
 
     /**
+     * Remove o vínculo do usuário do Telegram com a conta do site
+     */
+    async logout(telegramUserId: number) {
+        const { error } = await supabase
+            .from('users')
+            .update({ site_user_id: null })
+            .eq('telegram_user_id', telegramUserId);
+
+        if (error) {
+            console.error('❌ Erro ao deslogar usuário:', error.message);
+            return { success: false, message: 'Erro ao deslogar. Tente novamente.' };
+        }
+
+        return { success: true };
+    }
+
+    /**
      * Reenvia e-mail de confirmação
      */
     async resendVerificationEmail(email: string) {

@@ -128,3 +128,21 @@ export async function handleVerificationHelp(ctx: Context) {
         { parse_mode: 'Markdown' }
     );
 }
+
+/**
+ * Realiza o logout do usuário e reseta o fluxo
+ */
+export async function handleLogout(ctx: Context) {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+
+    await authService.logout(userId);
+    await stateService.reset(userId);
+
+    await ctx.reply('👋 *Logout realizado com sucesso!*', { parse_mode: 'Markdown' });
+
+    // Redireciona para o fluxo inicial
+    const { handleStart } = await import('./start.handler.js');
+    return handleStart(ctx);
+}
+
