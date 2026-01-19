@@ -48,13 +48,17 @@ class TelegramService {
       // Formato fluido para aproveitar a largura da imagem
       message = `${actionVerb} ${ad.quantidade.toLocaleString('pt-BR')} milhas *${ad.companhia.toUpperCase()}* para emissão com *${ad.passengers || 1} CPF*. ${actionVerb} por *R$ ${ad.valor_milheiro.toFixed(2).replace('.', ',')}* cada mil milhas.\n\n`;
 
-      const emissaoEmoji = ad.urgent ? '❌' : '✅';
-      message += `▶️ Emissão para mais de sete dias: ${emissaoEmoji}\n`;
+      const emissaoDesc = ad.urgent
+        ? '▶️ Emissão para menos de sete dias ⚠️'
+        : '▶️ Emissão para mais de sete dias: ✅';
+      message += `${emissaoDesc}\n`;
       message += `▶️ Oferta de compra ${adIdShort}\n\n`;
     } else {
       // Formato para venda
-      const emissaoEmoji = ad.urgent ? '❌' : '✅';
-      message += `▶️ Emissão para mais de sete dias: ${emissaoEmoji}\n`;
+      const emissaoDesc = ad.urgent
+        ? '▶️ Emissão para menos de sete dias ⚠️'
+        : '▶️ Emissão para mais de sete dias: ✅';
+      message += `${emissaoDesc}\n`;
       message += `▶️ Oferta de venda ${adIdShort}\n\n`;
     }
 
@@ -139,11 +143,15 @@ class TelegramService {
       const deepLink = `https://t.me/${config.botUsername}?start=proposta_${ad.id}`;
       const bannerPath = this.getAirlineBannerPath(ad.companhia);
 
+      const buttonText = ad.type === 'SELL'
+        ? '🛒 COMPRAR DESSA OFERTA'
+        : '💰 VENDER PARA ESSA OFERTA';
+
       const replyMarkup = {
         inline_keyboard: [
           [
             {
-              text: '💬 Fazer Proposta',
+              text: buttonText,
               url: deepLink,
             },
           ],

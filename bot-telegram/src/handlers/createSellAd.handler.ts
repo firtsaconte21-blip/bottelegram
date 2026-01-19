@@ -108,34 +108,7 @@ export async function handleSellPriceResponse(ctx: Context, text: string): Promi
     const cleanInput = text.replace(',', '.');
     const price = parseFloat(cleanInput);
 
-    if (isNaN(price) || price <= 0) {
-        await ctx.reply('❌ Valor inválido. Digite apenas números (ex: 26,50).');
-        return;
-    }
-
-    await stateService.updateUserState(userId, 'ASK_SELL_URGENT', { price });
-
-    await ctx.reply(
-        '▶️ *Emissão para mais de sete dias?*',
-        {
-            parse_mode: 'Markdown',
-            ...Markup.inlineKeyboard([
-                [Markup.button.callback('✅ SIM (Mais de 7 dias)', 'urgent_sell_no')],
-                [Markup.button.callback('❌ NÃO (Menos de 7 dias)', 'urgent_sell_yes')]
-            ])
-        }
-    );
-}
-
-/**
- * Processa a urgência
- */
-export async function handleSellUrgentResponse(ctx: Context, input: 'yes' | 'no' | string): Promise<void> {
-    const userId = ctx.from?.id;
-    if (!userId) return;
-
-    const urgent = input === 'yes' || input === 'Sim';
-    await stateService.updateUserState(userId, 'CONFIRM_SELL_AD', { urgent });
+    await stateService.updateUserState(userId, 'CONFIRM_SELL_AD', { price, urgent: false });
 
     // Recupera dados para o resumo
     const state = await stateService.getState(userId);
@@ -148,7 +121,6 @@ export async function handleSellUrgentResponse(ctx: Context, input: 'yes' | 'no'
     }
 
     const total = (data.miles / 1000) * data.price;
-    const emissaoEmoji = urgent ? '❌' : '✅';
 
     const summary = `
 📄 *RESUMO DO ANÚNCIO DE VENDA*
@@ -156,7 +128,6 @@ export async function handleSellUrgentResponse(ctx: Context, input: 'yes' | 'no'
 Você está vendendo:
 ✈️ *${data.miles.toLocaleString('pt-BR')} milhas ${data.program}*
 💰 *R$ ${data.price.toFixed(2)} por mil milhas*
-⌛ *Mais de 7 dias:* ${emissaoEmoji}
 
 💵 *Total estimado:* R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} + taxas
 
@@ -173,6 +144,11 @@ Você está vendendo:
 }
 
 /**
+ * Processa a urgência
+ */
+
+
+/**
  * Confirma e salva o anúncio
  */
 export async function handleConfirmSellAd(ctx: Context, input: string): Promise<void> {
@@ -180,6 +156,18 @@ export async function handleConfirmSellAd(ctx: Context, input: string): Promise<
     const username = ctx.from?.username || null;
     if (!userId) return;
 
+    // Proteção contra re-entrada ou mensagens de texto aleatórias durante confirmação
+    if (!['yes', 'restart'].includes(input)) {
+        console.warn(`[SELL_AD] Ignored invalid input for confirmation: ${input}`);
+        return;
+    }
+
+    // Remove botões após ação
+    try {
+        await ctx.editMessageReplyMarkup(undefined);
+    } catch (e) {
+        console.warn('[SELL_AD] Failed to clean up buttons:', e);
+    }
     if (input === 'restart') {
         await startCreateSellAd(ctx);
         return;

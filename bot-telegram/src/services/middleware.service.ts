@@ -2,13 +2,16 @@ import { Context } from 'telegraf';
 import { authService } from './auth.service.js';
 import { subscriptionService } from './subscription.service.js';
 
-export async function checkAccess(ctx: Context, next: () => Promise<void>, requiredPermission?: 'BUY' | 'SELL') {
+export async function checkAccess(ctx: Context, next: () => Promise<void>, requiredPermission?: 'BUY' | 'SELL', onUnauthenticated?: () => Promise<void>) {
     const userId = ctx.from?.id;
     if (!userId) return;
 
     // 1. Verifica se está logado (vinculado ao site)
     const siteUserId = await authService.getLinkedUser(userId);
     if (!siteUserId) {
+        if (onUnauthenticated) {
+            return onUnauthenticated();
+        }
         return ctx.reply(
             '⚠️ *Acesso Restrito* \n\n' +
             'Você precisa vincular sua conta do site para usar esta função. \n' +
@@ -36,7 +39,7 @@ export async function checkAccess(ctx: Context, next: () => Promise<void>, requi
                 .from('plans')
                 .select('id')
                 .ilike('name', '%Full%')
-                .single()
+                .maybeSingle()
             );
 
             const buttons = [];

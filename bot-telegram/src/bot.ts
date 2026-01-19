@@ -8,7 +8,7 @@ import { supabase } from './repositories/supabase.js';
 import { checkAccess } from './services/middleware.service.js';
 
 // Handlers
-import { handleStart, handleHelp } from './handlers/start.handler.js';
+import { handleStart, handleHelp, showWelcomeFlow } from './handlers/start.handler.js';
 import {
   handleLogin,
   handleLogout,
@@ -40,7 +40,6 @@ import {
   handleSellMilesResponse,
   handleSellProgramResponse,
   handleSellPriceResponse,
-  handleSellUrgentResponse,
   handleConfirmSellAd,
   setSellAdTelegramService
 } from './handlers/createSellAd.handler.js';
@@ -133,7 +132,7 @@ app.post('/webhook', async (req, res) => {
             .from('plans')
             .select('id, name, duration_days')
             .eq('id', planId)
-            .single();
+            .maybeSingle();
 
           if (plan) {
             const endDate = new Date();
@@ -303,17 +302,17 @@ bot.action(/^buy_plan_(.+)$/, handlePlanSelection);
 
 bot.action('create_sell_ad', async (ctx, next) => {
   await ctx.answerCbQuery();
-  return checkAccess(ctx, () => startCreateSellAd(ctx), 'SELL');
+  return checkAccess(ctx, () => startCreateSellAd(ctx), 'SELL', () => showWelcomeFlow(ctx, ctx.from!.id));
 });
 
 bot.action('create_buy_ad', async (ctx, next) => {
   await ctx.answerCbQuery();
-  return checkAccess(ctx, () => startCreateBuyAd(ctx), 'BUY');
+  return checkAccess(ctx, () => startCreateBuyAd(ctx), 'BUY', () => showWelcomeFlow(ctx, ctx.from!.id));
 });
 
 bot.action('my_ads', async (ctx) => {
   await ctx.answerCbQuery();
-  return checkAccess(ctx, () => handleMyAds(ctx));
+  return checkAccess(ctx, () => handleMyAds(ctx), undefined, () => showWelcomeFlow(ctx, ctx.from!.id));
 });
 
 // Handler genérico para "Criar Anúncio" (usado no Meus Anúncios)
@@ -342,9 +341,9 @@ bot.action('create_ad', async (ctx) => {
       ])
     });
   } else if (features.includes('SELL')) {
-    return checkAccess(ctx, () => startCreateSellAd(ctx), 'SELL');
+    return checkAccess(ctx, () => startCreateSellAd(ctx), 'SELL', () => showWelcomeFlow(ctx, ctx.from!.id));
   } else if (features.includes('BUY')) {
-    return checkAccess(ctx, () => startCreateBuyAd(ctx), 'BUY');
+    return checkAccess(ctx, () => startCreateBuyAd(ctx), 'BUY', () => showWelcomeFlow(ctx, ctx.from!.id));
   } else {
     return showPlans(ctx);
   }
@@ -411,8 +410,14 @@ bot.action(/^rate_star_(\d+)$/, async (ctx) => {
   await handleRatingStars(ctx, stars);
 });
 
-// Start Rating: rate_<adId>_<targetUserId>_<proposalId>
-// Ex: rate_uuid_userid_uuid
+// Start Rating (Novo Formato): rate_p_<proposalId>
+bot.action(/^rate_p_(.+)$/, async (ctx) => {
+  const proposalId = ctx.match[1];
+  await ctx.answerCbQuery();
+  await startRating(ctx, `p_${proposalId}`);
+});
+
+// Start Rating (Legado): rate_<adId>_<targetUserId>_<proposalId>
 bot.action(/^rate_([^_]+)_(\d+)_([^_]+)$/, async (ctx) => {
   const adId = ctx.match[1];
   const targetUserId = ctx.match[2];
@@ -443,7 +448,7 @@ bot.action('show_verification_help', async (ctx) => {
 bot.action(/^prop_all_(.+)$/, async (ctx) => {
   const adId = ctx.match[1];
   await ctx.answerCbQuery();
-  return checkAccess(ctx, () => handleProposalBuyAll(ctx, adId));
+  return checkAccess(ctx, () => handleProposalBuyAll(ctx, adId), undefined, () => showWelcomeFlow(ctx, ctx.from!.id));
 });
 
 bot.action(/^prop_custom_qty_(.+)$/, async (ctx) => {
@@ -451,7 +456,7 @@ bot.action(/^prop_custom_qty_(.+)$/, async (ctx) => {
   await ctx.answerCbQuery();
   const ad = await adsService.getById(adId);
   const requiredPermission = ad?.type === 'SELL' ? 'BUY' : 'SELL';
-  return checkAccess(ctx, () => handleProposalCustomQty(ctx, adId), requiredPermission);
+  return checkAccess(ctx, () => handleProposalCustomQty(ctx, adId), requiredPermission, () => showWelcomeFlow(ctx, ctx.from!.id));
 });
 
 bot.action(/^prop_keep_price_(.+)$/, async (ctx) => {
@@ -489,15 +494,7 @@ bot.action('confirm_sell_restart', async (ctx) => {
   await handleConfirmSellAd(ctx, 'restart');
 });
 
-bot.action('urgent_sell_yes', async (ctx) => {
-  await ctx.answerCbQuery();
-  await handleSellUrgentResponse(ctx, 'yes');
-});
 
-bot.action('urgent_sell_no', async (ctx) => {
-  await ctx.answerCbQuery();
-  await handleSellUrgentResponse(ctx, 'no');
-});
 
 // BUY AD CALLBACKS
 bot.action(/^program_buy_(.+)$/, async (ctx) => {
@@ -618,9 +615,7 @@ bot.on('text', async (ctx) => {
       await handleSellPriceResponse(ctx, text);
       break;
 
-    case 'ASK_SELL_URGENT':
-      await handleSellUrgentResponse(ctx, text);
-      break;
+
 
     case 'CONFIRM_SELL_AD':
       await handleConfirmSellAd(ctx, text);

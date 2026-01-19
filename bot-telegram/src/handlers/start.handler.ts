@@ -49,15 +49,10 @@ export async function handleStart(ctx: Context): Promise<void> {
 }
 
 /**
- * Mostra o menu principal do bot
+ * Mostra o fluxo de boas-vindas para usuários não logados
  */
-async function showMainMenu(ctx: Context, userId: number): Promise<void> {
-  // Verifica se o usuário está vinculado a uma conta do site
-  const linkedUserId = await authService.getLinkedUser(userId);
-
-  if (!linkedUserId) {
-    // Usuário não está logado - mostra mensagem de boas-vindas com instruções
-    const welcomeMessage = `
+export async function showWelcomeFlow(ctx: Context, userId: number): Promise<void> {
+  const welcomeMessage = `
 🛫 *Bem-vindo ao Marketplace de Milhas!*
 
 Parece que você ainda não tem uma conta vinculada.
@@ -68,13 +63,23 @@ Parece que você ainda não tem uma conta vinculada.
 Digite seu e-mail abaixo para fazer login
     `.trim();
 
-    // Define o estado para aguardar o e-mail
-    await stateService.setState(userId, 'ASK_LOGIN_EMAIL');
+  // Define o estado para aguardar o e-mail
+  await stateService.setState(userId, 'ASK_LOGIN_EMAIL');
 
-    await ctx.reply(welcomeMessage, {
-      parse_mode: 'Markdown'
-    });
-    return;
+  await ctx.reply(welcomeMessage, {
+    parse_mode: 'Markdown'
+  });
+}
+
+/**
+ * Mostra o menu principal do bot
+ */
+async function showMainMenu(ctx: Context, userId: number): Promise<void> {
+  // Verifica se o usuário está vinculado a uma conta do site
+  const linkedUserId = await authService.getLinkedUser(userId);
+
+  if (!linkedUserId) {
+    return showWelcomeFlow(ctx, userId);
   }
 
   // Usuário está logado - mostra menu principal
@@ -135,7 +140,12 @@ async function handleProposalDeepLink(
     return;
   }
 
-  // Verifica acesso (Login + Plano)
+  // Verifica acesso (Login primeiro)
+  const siteUserId = await authService.getLinkedUser(userId);
+  if (!siteUserId) {
+    return showWelcomeFlow(ctx, userId);
+  }
+
   // Se o anúncio é de VENDA, o usuário quer COMPRAR (permissão BUY)
   // Se o anúncio é de COMPRA, o usuário quer VENDER (permissão SELL)
   const requiredPermission = ad.type === 'SELL' ? 'BUY' : 'SELL';

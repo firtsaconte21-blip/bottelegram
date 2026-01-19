@@ -81,7 +81,7 @@ export async function handlePlanSelection(ctx: Context) {
         .from('plans')
         .select('*')
         .eq('id', planId)
-        .single();
+        .maybeSingle();
 
     if (planError || !plan) {
         await ctx.reply('❌ Erro ao buscar informações do plano. Tente novamente.');
@@ -93,7 +93,7 @@ export async function handlePlanSelection(ctx: Context) {
         .from('users')
         .select('site_user_id')
         .eq('telegram_user_id', userId)
-        .single();
+        .maybeSingle();
 
     if (userError || !user?.site_user_id) {
         await ctx.reply('❌ Você precisa estar logado para comprar um plano. Use /login primeiro.');
@@ -104,7 +104,7 @@ export async function handlePlanSelection(ctx: Context) {
         .from('site_users')
         .select('full_name, email, cpf, phone')
         .eq('id', user.site_user_id)
-        .single();
+        .maybeSingle();
 
     if (siteUserError || !siteUser) {
         await ctx.reply('❌ Erro ao buscar seus dados cadastrais. Entre em contato com o suporte.');

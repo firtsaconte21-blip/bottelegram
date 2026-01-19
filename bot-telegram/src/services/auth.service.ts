@@ -1,4 +1,4 @@
-import { supabase } from '../repositories/supabase.js';
+import { supabase, getAuthClient } from '../repositories/supabase.js';
 
 export class AuthService {
     /**
@@ -6,8 +6,9 @@ export class AuthService {
      */
     async login(email: string, password: string, telegramUserId: number) {
         try {
-            // 1. Autentica no Supabase Auth
-            const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            // 1. Autentica no Supabase Auth usando um cliente novo
+            const authClient = getAuthClient();
+            const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
                 email,
                 password
             });
@@ -61,7 +62,7 @@ export class AuthService {
             .from('users')
             .select('site_user_id')
             .eq('telegram_user_id', telegramUserId)
-            .single();
+            .maybeSingle();
 
         if (error || !data?.site_user_id) return null;
         return data.site_user_id;
@@ -89,7 +90,8 @@ export class AuthService {
      */
     async resendVerificationEmail(email: string) {
         try {
-            const { error } = await supabase.auth.resend({
+            const authClient = getAuthClient();
+            const { error } = await authClient.auth.resend({
                 type: 'signup',
                 email
             });

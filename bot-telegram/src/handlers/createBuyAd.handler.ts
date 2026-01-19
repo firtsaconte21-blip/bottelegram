@@ -202,6 +202,19 @@ export async function handleConfirmBuyAd(ctx: Context, input: string): Promise<v
     const username = ctx.from?.username || null;
     if (!userId) return;
 
+    // Proteção contra re-entrada ou mensagens de texto durante confirmação
+    if (!['yes', 'restart'].includes(input)) {
+        console.warn(`[BUY_AD] Ignored invalid input for confirmation: ${input}`);
+        return;
+    }
+
+    // Remove botões após ação
+    try {
+        await ctx.editMessageReplyMarkup(undefined);
+    } catch (e) {
+        console.warn('[BUY_AD] Failed to clean up buttons:', e);
+    }
+
     if (input === 'restart') {
         await startCreateBuyAd(ctx);
         return;

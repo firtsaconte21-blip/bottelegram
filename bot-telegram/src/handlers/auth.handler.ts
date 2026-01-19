@@ -85,11 +85,13 @@ export async function handleLoginPassword(ctx: Context, password: string) {
             }
         );
     } else {
+        await stateService.setState(userId, 'ASK_LOGIN_EMAIL');
         await ctx.telegram.editMessageText(
             ctx.chat?.id!,
             statusMsg.message_id,
             undefined,
-            result.message || '❌ E-mail ou senha incorretos.',
+            (result.message || '❌ E-mail ou senha incorretos.') +
+            '\n\nPor favor, digite seu *e-mail* novamente para tentar de novo:',
             { parse_mode: 'Markdown' }
         );
     }

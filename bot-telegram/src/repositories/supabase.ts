@@ -9,6 +9,20 @@ export const supabase = createClient(config.supabaseUrl, config.supabaseServiceK
   },
 });
 
+/**
+ * Retorna uma nova instância do cliente Supabase para operações de autenticação.
+ * Isso evita que o cliente global 'supabase' seja "poluído" com a sessão de um usuário específico,
+ * o que causaria erros de permissão (RLS) em outras partes do bot.
+ */
+export function getAuthClient() {
+  return createClient(config.supabaseUrl, config.supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
 class SupabaseRepository {
   private client: SupabaseClient = supabase;
 
@@ -137,7 +151,6 @@ class SupabaseRepository {
       .insert({
         ad_id: data.ad_id,
         from_telegram_user_id: data.from_user_id,
-        from_username: data.from_username,
         quantidade: data.quantidade,
         valor_proposta: data.valor_proposta,
       })
@@ -145,7 +158,8 @@ class SupabaseRepository {
       .single();
 
     if (error) {
-      console.error('Erro ao criar proposta:', error);
+      console.error('❌ [DB] Erro ao criar proposta:', error.message);
+      console.dir(error);
       return null;
     }
 
@@ -228,7 +242,7 @@ class SupabaseRepository {
       .from('user_states')
       .select()
       .eq('telegram_user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (data) {
       // Map back to internal type
@@ -478,7 +492,7 @@ class SupabaseRepository {
         { onConflict: 'telegram_user_id', ignoreDuplicates: true }
       )
       .select()
-      .single();
+      .maybeSingle();
 
     // Se ignoreDuplicates for true e o usuário já existir, data será null?
     // Nesse caso, buscamos o usuário
@@ -499,7 +513,7 @@ class SupabaseRepository {
       .from('users')
       .select()
       .eq('telegram_user_id', telegramUserId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       //   console.error('Erro ao buscar usuário:', error); // Log opcional para não poluir

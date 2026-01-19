@@ -379,7 +379,8 @@ export async function handleProposalConfirm(ctx: Context, adId: string): Promise
   );
 
   if (!proposal) {
-    await ctx.reply('❌ Erro ao enviar proposta.');
+    console.error(`[PROPOSAL] Failed to create proposal for ad ${adId} from user ${userId}`);
+    await ctx.reply('❌ Erro ao enviar proposta. Por favor, tente novamente.');
     return;
   }
 
